@@ -1,17 +1,21 @@
 import React, { useEffect, useState } from 'react';
 import { marketplaceAPI } from '../../services/api';
 
+const PRODUCT_CATEGORIES = ['Beras', 'Minyak', 'Telur', 'Gula', 'Tepung', 'Bumbu', 'Minuman', 'Paket'];
+
 function MarketplaceAdmin() {
   const [products, setProducts] = useState([]);
   const [orders, setOrders] = useState([]);
-  const [activeTab, setActiveTab] = useState('products'); // products or orders
+  const [activeTab, setActiveTab] = useState('products');
   const [formValues, setFormValues] = useState({
     nama: '',
     deskripsi: '',
     harga: '',
-    kategori: 'lokal',
+    kategori: 'Beras',
     stok: '',
+    gambar: '',
   });
+  const [imagePreview, setImagePreview] = useState('');
   const [editingProductId, setEditingProductId] = useState(null);
   const [statusMessage, setStatusMessage] = useState(null);
   const [errorMessage, setErrorMessage] = useState(null);
@@ -47,22 +51,40 @@ function MarketplaceAdmin() {
     setFormValues((prev) => ({ ...prev, [name]: value }));
   }
 
+  function handleImageChange(event) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const result = reader.result || '';
+      setFormValues((prev) => ({ ...prev, gambar: result }));
+      setImagePreview(result);
+    };
+    reader.readAsDataURL(file);
+  }
+
   function startEdit(product) {
     setEditingProductId(product.id);
     setFormValues({
       nama: product.nama,
       deskripsi: product.deskripsi || '',
-      harga: product.harga.toString(),
-      kategori: product.kategori,
-      stok: product.stok.toString(),
+      harga: product.harga?.toString() || '',
+      kategori: product.kategori || 'Beras',
+      stok: product.stok?.toString() || '',
+      gambar: product.gambar || '',
     });
+    setImagePreview(product.gambar || '');
     setStatusMessage(null);
     setErrorMessage(null);
   }
 
   function cancelEdit() {
     setEditingProductId(null);
-    setFormValues({ nama: '', deskripsi: '', harga: '', kategori: 'lokal', stok: '' });
+    setFormValues({ nama: '', deskripsi: '', harga: '', kategori: 'Beras', stok: '', gambar: '' });
+    setImagePreview('');
+    setStatusMessage(null);
+    setErrorMessage(null);
   }
 
   async function handleSubmit(event) {
@@ -72,45 +94,63 @@ function MarketplaceAdmin() {
     setErrorMessage(null);
 
     try {
+      // Validate required fields
+      if (!formValues.nama.trim()) {
+        throw new Error('Nama produk tidak boleh kosong');
+      }
+      if (!formValues.harga || Number(formValues.harga) <= 0) {
+        throw new Error('Harga harus lebih besar dari 0');
+      }
+      if (!formValues.kategori) {
+        throw new Error('Kategori harus dipilih');
+      }
+      if (!formValues.stok || Number(formValues.stok) < 0) {
+        throw new Error('Stok tidak boleh negatif');
+      }
+
       const payload = {
-        nama: formValues.nama,
-        deskripsi: formValues.deskripsi,
+        nama: formValues.nama.trim(),
+        deskripsi: formValues.deskripsi.trim(),
         harga: Number(formValues.harga),
         kategori: formValues.kategori,
         stok: Number(formValues.stok),
       };
 
-      if (editingProductId) {
-        // Update existing product
-        await marketplaceAPI.updateProduct(editingProductId, payload);
-        setStatusMessage('Produk berhasil diperbarui.');
-        setEditingProductId(null);
-      } else {
-        // Create new product
-        await marketplaceAPI.createProduct(payload);
-        setStatusMessage('Produk berhasil ditambahkan.');
+      if (formValues.gambar) {
+        payload.gambar = formValues.gambar;
       }
 
-      setFormValues({ nama: '', deskripsi: '', harga: '', kategori: 'lokal', stok: '' });
+      if (editingProductId) {
+        await marketplaceAPI.updateProduct(editingProductId, payload);
+        setStatusMessage('✓ Produk berhasil diperbarui.');
+        setEditingProductId(null);
+      } else {
+        await marketplaceAPI.createProduct(payload);
+        setStatusMessage('✓ Produk berhasil ditambahkan.');
+      }
+
+      setFormValues({ nama: '', deskripsi: '', harga: '', kategori: 'Beras', stok: '', gambar: '' });
+      setImagePreview('');
       await loadProducts();
     } catch (err) {
       console.error(err);
-      setErrorMessage('Gagal menyimpan produk. Pastikan semua data terisi dengan benar.');
+      const errorMsg = err.response?.data?.message || err.message || 'Gagal menyimpan produk';
+      setErrorMessage('❌ ' + errorMsg);
     } finally {
       setIsSubmitting(false);
     }
   }
 
   async function deleteProduct(productId) {
-    if (window.confirm('Apakah Anda yakin ingin menghapus produk ini?')) {
-      try {
-        await marketplaceAPI.deleteProduct(productId);
-        setStatusMessage('Produk berhasil dihapus.');
-        await loadProducts();
-      } catch (err) {
-        console.error(err);
-        setErrorMessage('Gagal menghapus produk.');
-      }
+    if (!window.confirm('Apakah Anda yakin ingin menghapus produk ini?')) return;
+
+    try {
+      await marketplaceAPI.deleteProduct(productId);
+      setStatusMessage('Produk berhasil dihapus.');
+      await loadProducts();
+    } catch (err) {
+      console.error(err);
+      setErrorMessage('Gagal menghapus produk.');
     }
   }
 
@@ -186,12 +226,11 @@ function MarketplaceAdmin() {
                           name="kategori"
                           value={formValues.kategori}
                           onChange={handleChange}
+                          required
                         >
-                          <option value="lokal">Lokal</option>
-                          <option value="digital">Digital</option>
-                          <option value="pulsa">Pulsa</option>
-                          <option value="token_listrik">Token Listrik</option>
-                          <option value="paket_data">Paket Data</option>
+                          {PRODUCT_CATEGORIES.map((category) => (
+                            <option key={category} value={category}>{category}</option>
+                          ))}
                         </select>
                       </div>
                     </div>
@@ -237,16 +276,29 @@ function MarketplaceAdmin() {
                     />
                   </div>
 
-                  <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  <div className="form-group">
+                    <label>Upload Gambar Produk</label>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="form-control"
+                      onChange={handleImageChange}
+                    />
+                  </div>
+
+                  {imagePreview && (
+                    <div style={{ margin: '1rem 0' }}>
+                      <div style={{ marginBottom: '0.5rem', color: '#4b5563', fontWeight: 700 }}>Preview Gambar</div>
+                      <img src={imagePreview} alt="Preview Produk" style={{ width: '100%', maxWidth: 320, borderRadius: 18, objectFit: 'cover' }} />
+                    </div>
+                  )}
+
+                  <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                     <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
                       {isSubmitting ? 'Menyimpan...' : editingProductId ? 'Perbarui Produk' : 'Tambah Produk'}
                     </button>
                     {editingProductId && (
-                      <button
-                        type="button"
-                        className="btn btn-secondary"
-                        onClick={cancelEdit}
-                      >
+                      <button type="button" className="btn btn-secondary" onClick={cancelEdit}>
                         Batal
                       </button>
                     )}
@@ -260,6 +312,7 @@ function MarketplaceAdmin() {
                   <table className="table table-hover">
                     <thead>
                       <tr>
+                        <th>Gambar</th>
                         <th>Nama</th>
                         <th>Kategori</th>
                         <th>Harga</th>
@@ -271,6 +324,13 @@ function MarketplaceAdmin() {
                     <tbody>
                       {products.map((product) => (
                         <tr key={product.id}>
+                          <td>
+                            <img
+                              src={product.gambar || 'https://via.placeholder.com/100x80?text=No+Image'}
+                              alt={product.nama}
+                              style={{ width: 80, height: 60, objectFit: 'cover', borderRadius: 8 }}
+                            />
+                          </td>
                           <td>{product.nama}</td>
                           <td>
                             <span style={{ background: '#e9f5ff', color: '#0369a1', padding: '0.25rem 0.5rem', borderRadius: 4, fontSize: '0.85rem' }}>
@@ -278,12 +338,11 @@ function MarketplaceAdmin() {
                             </span>
                           </td>
                           <td>Rp {Number(product.harga).toLocaleString('id-ID')}</td>
-                          <td>
-                            <strong>{product.stok}</strong>
-                          </td>
+                          <td><strong>{product.stok}</strong></td>
                           <td>{product.aktif ? '✓ Aktif' : '✗ Nonaktif'}</td>
                           <td>
                             <button
+                              type="button"
                               onClick={() => startEdit(product)}
                               style={{
                                 padding: '0.4rem 0.8rem',
@@ -299,6 +358,7 @@ function MarketplaceAdmin() {
                               Edit
                             </button>
                             <button
+                              type="button"
                               onClick={() => deleteProduct(product.id)}
                               style={{
                                 padding: '0.4rem 0.8rem',

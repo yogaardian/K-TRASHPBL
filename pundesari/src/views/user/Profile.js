@@ -1,98 +1,254 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useHistory } from "react-router-dom";
-import { Container, Card, Row, Col, ListGroup } from "react-bootstrap";
 import Sidebar from "../../components/Sidebar.jsx";
 import "../../css/Dashboard.css";
 import "../../css/sidebar.css";
+import "../../css/Profile.css";
 
 function Profile() {
   const history = useHistory();
-  const [user] = useState({
-    name: localStorage.getItem("nama") || "User",
-    email: localStorage.getItem("email") || "user@example.com",
-    phoneNumber: localStorage.getItem("nomor_hp") || "-",
+  const [formData, setFormData] = useState({
+    name: "",
+    email: "",
+    phoneNumber: "",
   });
+  const [profilePhoto, setProfilePhoto] = useState(null);
+  const [message, setMessage] = useState(null);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    loadProfile();
+  }, []);
+
+  const loadProfile = () => {
+    const storedName = localStorage.getItem("nama") || "User";
+    const storedEmail = localStorage.getItem("email") || "user@example.com";
+    const storedPhone = localStorage.getItem("nomor_hp") || "-";
+    const storedPhoto = localStorage.getItem("profilePhoto") || null;
+    setFormData({
+      name: storedName,
+      email: storedEmail,
+      phoneNumber: storedPhone,
+    });
+    setProfilePhoto(storedPhoto);
+  };
 
   const handleLogout = () => {
     localStorage.clear();
     history.push("/login");
   };
 
+  const handleInputChange = (field) => (event) => {
+    setFormData((prev) => ({ ...prev, [field]: event.target.value }));
+  };
+
+  const handleSave = async () => {
+    setLoading(true);
+    try {
+      localStorage.setItem("nama", formData.name);
+      localStorage.setItem("email", formData.email);
+      localStorage.setItem("nomor_hp", formData.phoneNumber);
+      if (profilePhoto) {
+        localStorage.setItem("profilePhoto", profilePhoto);
+      }
+      setMessage({ type: "success", text: "✓ Profil berhasil disimpan." });
+      setTimeout(() => setMessage(null), 3000);
+    } catch (error) {
+      setMessage({ type: "danger", text: "Gagal menyimpan profil." });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handlePhotoUpload = (event) => {
+    const file = event.target.files[0];
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) {
+        setMessage({ type: "danger", text: "Ukuran foto terlalu besar (maksimal 5MB)." });
+        return;
+      }
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setProfilePhoto(reader.result);
+        setMessage({ type: "info", text: "Foto dipilih. Klik Simpan untuk menyimpan." });
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleRemovePhoto = () => {
+    setProfilePhoto(null);
+    localStorage.removeItem("profilePhoto");
+    setMessage({ type: "info", text: "Foto profil dihapus." });
+  };
+
+  const handleReset = () => {
+    loadProfile();
+    setMessage({ type: "info", text: "Perubahan dibatalkan." });
+  };
+
+  const handleDeleteAccount = () => {
+    if (window.confirm("Apakah Anda yakin ingin menghapus akun? Tindakan ini tidak dapat dibatalkan.")) {
+      localStorage.clear();
+      history.push("/login");
+    }
+  };
+
   return (
     <div className="dashboard-layout">
       <Sidebar />
       <main className="dashboard-main">
-        <div style={{ backgroundColor: "#F5F5F5", minHeight: "100vh" }}>
-          <div style={{
-        height: "200px",
-        background: "linear-gradient(to bottom, #81C784, #C8E6C9)"
-      }}></div>
-      <Container style={{ marginTop: "-150px" }}>
-        <Row>
-          <Col md="8" className="mx-auto">
-            <div className="d-flex align-items-center mb-4">
-              <i 
-                className="nc-icon nc-minimal-left" 
-                style={{ fontSize: "24px", cursor: "pointer", marginRight: "15px" }}
-                onClick={() => history.push("/user/dashboard")}
-              ></i>
-              <h4 style={{ fontWeight: "bold", color: "#333", margin: "0" }}>Profileku</h4>
+        <div className="profile-container">
+          {/* Header */}
+          <div className="profile-header">
+            <button
+              onClick={() => history.push("/user/dashboard")}
+              className="profile-back-btn"
+            >
+              ← 
+            </button>
+            <h1>Pengaturan Profil</h1>
+          </div>
+
+          {/* Message Alert */}
+          {message && (
+            <div className={`profile-message ${message.type}`}>
+              {message.text}
             </div>
-            
-            <Card style={{ borderRadius: "15px", boxShadow: "0 5px 10px rgba(0,0,0,0.1)", border: "none" }}>
-              <Card.Body className="d-flex align-items-center p-4">
-                <div style={{
-                  width: "80px", height: "80px", borderRadius: "50%", backgroundColor: "#eee", display: "flex", justifyContent: "center", alignItems: "center"
-                }}>
-                  <i className="nc-icon nc-single-02" style={{ fontSize: "40px", color: "#fff" }}></i>
-                </div>
-                <div className="ml-4 flex-grow-1">
-                  <h5 style={{ fontWeight: "bold", margin: "0" }}>{user.name}</h5>
-                  <p style={{ color: "#888", margin: "0", fontSize: "14px" }}>{user.email}</p>
-                  <p style={{ color: "#888", margin: "0", fontSize: "14px" }}>{user.phoneNumber}</p>
-                </div>
-                <i className="nc-icon nc-settings-gear-64 text-muted"></i>
-              </Card.Body>
-            </Card>
+          )}
 
-            <h6 className="text-muted mt-4 mb-3" style={{ fontSize: "13px", paddingLeft: "15px" }}>Aktivitas BankTrash</h6>
-            <Card style={{ borderRadius: "15px", border: "none" }}>
-              <ListGroup variant="flush" style={{ borderRadius: "15px" }}>
-                <ListGroup.Item action className="d-flex justify-content-between align-items-center" style={{ border: "none" }}>
-                  <div><i className="nc-icon nc-pin-3 mr-3 text-dark"></i> Alamat Tersimpan</div>
-                  <i className="nc-icon nc-minimal-right text-muted"></i>
-                </ListGroup.Item>
-                <ListGroup.Item action className="d-flex justify-content-between align-items-center" style={{ border: "none" }}>
-                  <div><i className="nc-icon nc-time-alarm mr-3 text-dark"></i> Aktivitas</div>
-                  <i className="nc-icon nc-minimal-right text-muted"></i>
-                </ListGroup.Item>
-              </ListGroup>
-            </Card>
+          <div className="profile-grid">
+            {/* Profile Card */}
+            <div className="profile-card">
+              <div className="profile-card-header">
+                {/* Avatar */}
+                <div className="profile-avatar">
+                  {profilePhoto ? (
+                    <img
+                      src={profilePhoto}
+                      alt="profile"
+                    />
+                  ) : (
+                    <svg width="50" height="50" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
+                      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                      <circle cx="12" cy="7" r="4" />
+                    </svg>
+                  )}
+                </div>
 
-            <h6 className="text-muted mt-4 mb-3" style={{ fontSize: "13px", paddingLeft: "15px" }}>Lainnya</h6>
-            <Card style={{ borderRadius: "15px", border: "none" }}>
-              <ListGroup variant="flush" style={{ borderRadius: "15px" }}>
-                <ListGroup.Item action className="d-flex justify-content-between align-items-center" style={{ border: "none" }}>
-                  <div><i className="nc-icon nc-support-17 mr-3 text-dark"></i> Bantuan dan laporan</div>
-                  <i className="nc-icon nc-minimal-right text-muted"></i>
-                </ListGroup.Item>
-                <ListGroup.Item action className="d-flex justify-content-between align-items-center" style={{ border: "none" }}>
-                  <div><i className="nc-icon nc-paper-2 mr-3 text-dark"></i> Ketentuan layanan</div>
-                  <i className="nc-icon nc-minimal-right text-muted"></i>
-                </ListGroup.Item>
-                <ListGroup.Item action className="d-flex justify-content-between align-items-center" style={{ border: "none" }}>
-                  <div><i className="nc-icon nc-simple-remove mr-3 text-dark"></i> Hapus akun</div>
-                  <i className="nc-icon nc-minimal-right text-muted"></i>
-                </ListGroup.Item>
-                <ListGroup.Item action onClick={handleLogout} className="d-flex justify-content-between align-items-center text-danger" style={{ border: "none", cursor: "pointer" }}>
-                  <div><i className="nc-icon nc-button-power mr-3"></i> Keluar</div>
-                  <i className="nc-icon nc-minimal-right"></i>
-                </ListGroup.Item>
-              </ListGroup>
-            </Card>
-          </Col>
-        </Row>
-      </Container>
+                {/* Info */}
+                <div className="profile-info">
+                  <h3>{formData.name}</h3>
+                  <p>{formData.email}</p>
+                  <p>{formData.phoneNumber}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Edit Form */}
+            <div className="profile-card">
+              <h3 className="profile-card-title">Edit Profil</h3>
+
+              {/* Photo Upload */}
+              <div className="profile-form-group">
+                <label>Foto Profil</label>
+                <div className="profile-form-row">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handlePhotoUpload}
+                    className="profile-file-input"
+                  />
+                  {profilePhoto && (
+                    <button
+                      onClick={handleRemovePhoto}
+                      className="profile-btn profile-btn-remove"
+                    >
+                      Hapus
+                    </button>
+                  )}
+                </div>
+                {profilePhoto && (
+                  <div className="profile-preview">
+                    <p>Preview:</p>
+                    <img src={profilePhoto} alt="preview" />
+                  </div>
+                )}
+              </div>
+
+              {/* Name */}
+              <div className="profile-form-group">
+                <label>Nama Lengkap</label>
+                <input
+                  type="text"
+                  value={formData.name}
+                  onChange={handleInputChange("name")}
+                  placeholder="Masukkan nama lengkap"
+                  className="profile-text-input"
+                />
+              </div>
+
+              {/* Email */}
+              <div className="profile-form-group">
+                <label>Email</label>
+                <input
+                  type="email"
+                  value={formData.email}
+                  onChange={handleInputChange("email")}
+                  placeholder="Masukkan email"
+                  className="profile-text-input"
+                />
+              </div>
+
+              {/* Phone */}
+              <div className="profile-form-group">
+                <label>Nomor HP</label>
+                <input
+                  type="text"
+                  value={formData.phoneNumber}
+                  onChange={handleInputChange("phoneNumber")}
+                  placeholder="Masukkan nomor HP"
+                  className="profile-text-input"
+                />
+              </div>
+
+              {/* Buttons */}
+              <div className="profile-action-buttons">
+                <button
+                  onClick={handleSave}
+                  disabled={loading}
+                  className="profile-btn profile-btn-primary"
+                  style={{ opacity: loading ? 0.7 : 1, cursor: loading ? "not-allowed" : "pointer" }}
+                >
+                  {loading ? "Menyimpan..." : "Simpan Perubahan"}
+                </button>
+                <button
+                  onClick={handleReset}
+                  className="profile-btn profile-btn-secondary"
+                >
+                  Reset
+                </button>
+              </div>
+            </div>
+
+            {/* More Options */}
+            <div className="profile-card">
+              <button
+                onClick={handleDeleteAccount}
+                className="profile-btn profile-btn-danger"
+                style={{ width: "100%", marginBottom: "0.75rem" }}
+              >
+                Hapus Akun
+              </button>
+              <button
+                onClick={handleLogout}
+                className="profile-btn profile-btn-danger"
+                style={{ width: "100%" }}
+              >
+                Keluar
+              </button>
+            </div>
+          </div>
         </div>
       </main>
     </div>
