@@ -1,0 +1,26 @@
+{
+  "name": "k-trash",
+  "version": "1.0.0",
+  "description": "K-Trash: Waste Management System",
+  "private": true,
+  "scripts": {
+    "install:all": "npm install && cd backend && npm install && cd ../pundesari && npm install",
+    "dev": "npm run dev:backend & npm run dev:frontend",
+    "dev:backend": "cd backend && npm run dev",
+    "dev:frontend": "cd pundesari && npm start",
+    "build": "npm run build:backend && npm run build:frontend",
+    "build:backend": "cd backend && npm run build",
+    "build:frontend": "cd pundesari && npm run build",
+    "start:backend": "cd backend && npm start",
+    "start:frontend": "cd pundesari && npm start",
+    "init:db": "cd backend && npm run init:db"
+  },
+  "workspaces": [
+    "backend",
+    "pundesari"
+  ],
+  "engines": {
+    "node": ">=16.0.0",
+    "npm": ">=8.0.0"
+  }
+}

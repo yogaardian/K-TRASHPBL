@@ -1,0 +1,52 @@
+const jwt = require('jsonwebtoken');
+const db = require('../db');
+
+const JWT_SECRET = process.env.JWT_SECRET;
+
+if (!JWT_SECRET) {
+  console.error('Environment variable JWT_SECRET is required.');
+  process.exit(1);
+}
+
+const authenticateToken = async (req, res, next) => {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+
+  if (!token) {
+    return res.status(401).json({ message: 'Access token required' });
+  }
+
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET);
+    const [users] = await db.query('SELECT id, nama, email, role FROM users WHERE id = ?', [decoded.id]);
+
+    if (users.length === 0) {
+      return res.status(401).json({ message: 'User not found' });
+    }
+
+    req.user = users[0];
+    next();
+  } catch (err) {
+    return res.status(403).json({ message: 'Invalid token' });
+  }
+};
+
+const requireRole = (roles) => {
+  return (req, res, next) => {
+    if (!req.user) {
+      return res.status(401).json({ message: 'Authentication required' });
+    }
+
+    if (!roles.includes(req.user.role)) {
+      return res.status(403).json({ message: 'Insufficient permissions' });
+    }
+
+    next();
+  };
+};
+
+module.exports = {
+  authenticateToken,
+  requireRole,
+  JWT_SECRET,
+};
